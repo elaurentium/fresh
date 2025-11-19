@@ -1,9 +1,7 @@
 //! Status bar and prompt/minibuffer rendering
 
-use crate::keybindings::format_keybinding;
 use crate::prompt::Prompt;
 use crate::state::EditorState;
-use crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
