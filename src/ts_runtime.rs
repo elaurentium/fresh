@@ -41,36 +41,18 @@
 
 use crate::commands::Suggestion;
 use crate::event::BufferId;
-use crate::plugin_api::{EditorStateSnapshot, PluginCommand};
+use crate::plugin_api::{EditorStateSnapshot, LayoutHints, PluginCommand};
 use anyhow::{anyhow, Result};
 use deno_core::{
     extension, op2, FastString, JsRuntime, ModuleLoadResponse, ModuleSource, ModuleSourceCode,
     ModuleSpecifier, ModuleType, OpState, RequestedModuleType, ResolutionKind, RuntimeOptions,
 };
-use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::ops::Range;
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
-/// Layout hints supplied by transforms
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LayoutHints {
-    /// Optional compose width
-    pub compose_width: Option<u16>,
-    /// Optional column guides (e.g., for tables)
-    pub column_guides: Option<Vec<u16>>,
-}
-
-/// View transform data stored per buffer (viewport-scoped)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ViewTransform {
-    /// Byte range this transform applies to (viewport)
-    pub range: Range<usize>,
-    /// Layout hints
-    pub layout_hints: Option<LayoutHints>,
-}
+// LayoutHints and ViewTransform are defined in plugin_api
 
 /// Custom module loader that transpiles TypeScript to JavaScript
 struct TypeScriptModuleLoader;
@@ -168,8 +150,6 @@ struct TsRuntimeState {
     >,
     /// Next request ID for async operations
     next_request_id: Rc<RefCell<u64>>,
-    /// View transforms per buffer (viewport-scoped)
-    view_transforms: HashMap<u32, ViewTransform>,
 }
 
 /// Display a transient message in the editor's status bar
@@ -581,15 +561,19 @@ fn op_fresh_submit_view_transform(
     #[serde] layout_hints: Option<LayoutHints>,
 ) -> bool {
     if let Some(runtime_state) = state.try_borrow::<Rc<RefCell<TsRuntimeState>>>() {
-        let mut rs = runtime_state.borrow_mut();
-        rs.view_transforms.insert(
-            buffer_id,
-            ViewTransform {
+        let runtime_state = runtime_state.borrow();
+        let hints = layout_hints.unwrap_or(LayoutHints {
+            compose_width: None,
+            column_guides: None,
+        });
+        let result = runtime_state
+            .command_sender
+            .send(PluginCommand::SetLayoutHints {
+                buffer_id: BufferId(buffer_id as usize),
                 range: start as usize..end as usize,
-                layout_hints,
-            },
-        );
-        return true;
+                hints,
+            });
+        return result.is_ok();
     }
     false
 }
@@ -2068,7 +2052,6 @@ impl TypeScriptRuntime {
             event_handlers: event_handlers.clone(),
             pending_responses: Arc::clone(&pending_responses),
             next_request_id: Rc::new(RefCell::new(1)),
-            view_transforms: HashMap::new(),
         }));
 
         let mut js_runtime = JsRuntime::new(RuntimeOptions {

@@ -8,6 +8,7 @@ use crate::commands::Command;
 use crate::event::{BufferId, SplitId};
 use crate::hooks::{HookCallback, HookRegistry};
 use serde_json::Value;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::Range;
 use std::path::PathBuf;
@@ -61,6 +62,15 @@ pub struct ViewportInfo {
     pub width: u16,
     /// Viewport height
     pub height: u16,
+}
+
+/// Layout hints supplied by plugins (e.g., Compose mode)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LayoutHints {
+    /// Optional compose width for centering/wrapping
+    pub compose_width: Option<u16>,
+    /// Optional column guides for aligned tables
+    pub column_guides: Option<Vec<u16>>,
 }
 
 /// Snapshot of editor state for plugin queries
@@ -165,6 +175,13 @@ pub enum PluginCommand {
         args: Vec<String>,
         cwd: Option<String>,
         callback_id: u64, // ID to look up callback in _spawn_callbacks Lua table
+    },
+
+    /// Set layout hints for a buffer/viewport
+    SetLayoutHints {
+        buffer_id: BufferId,
+        range: Range<usize>,
+        hints: LayoutHints,
     },
 
     /// Remove all overlays from a buffer

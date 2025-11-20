@@ -93,6 +93,9 @@ pub struct EditorState {
 
     /// Previously configured line number visibility (to restore after Compose)
     pub compose_prev_line_numbers: Option<bool>,
+
+    /// Optional column guides (e.g., for tables) supplied by layout hints
+    pub compose_column_guides: Option<Vec<u16>>,
 }
 
 impl EditorState {
@@ -126,6 +129,7 @@ impl EditorState {
             view_mode: ViewMode::Source,
             compose_width: None,
             compose_prev_line_numbers: None,
+            compose_column_guides: None,
         }
     }
 
@@ -187,6 +191,7 @@ impl EditorState {
             view_mode: ViewMode::Source,
             compose_width: None,
             compose_prev_line_numbers: None,
+            compose_column_guides: None,
         })
     }
 

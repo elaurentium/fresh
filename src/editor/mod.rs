@@ -3361,6 +3361,16 @@ impl Editor {
                 // Request a render so the lines_changed hook fires
                 self.plugin_render_requested = true;
             }
+            PluginCommand::SetLayoutHints {
+                buffer_id,
+                range: _,
+                hints,
+            } => {
+                if let Some(state) = self.buffers.get_mut(&buffer_id) {
+                    state.compose_width = hints.compose_width;
+                    state.compose_column_guides = hints.column_guides;
+                }
+            }
             PluginCommand::OpenFileAtLocation { path, line, column } => {
                 // Open the file
                 if let Err(e) = self.open_file(&path) {
