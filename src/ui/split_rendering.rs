@@ -521,6 +521,9 @@ impl SplitRenderer {
             view_lines.push((0, String::new(), false));
         }
 
+        // Extra sources for synthesized view indices (e.g., end-of-line cursor indicators)
+        let mut view_extra_sources: HashMap<usize, Option<usize>> = HashMap::new();
+
         // Build source->view map (first occurrence)
         let mut source_to_view = HashMap::new();
         for (view_idx, src_opt) in view_mapping.iter().enumerate() {
@@ -1200,12 +1203,10 @@ impl SplitRenderer {
             // Note: We already handle cursors on newlines in the loop above.
             // For lines without newlines (last line or empty lines), check if cursor is at end
             if !line_has_newline {
+                let line_len_chars = line_content.chars().count();
                 let line_end_pos = line_view_offset
-                    + line_content
-                        .chars()
-                        .count()
-                        .saturating_sub(1);
-                let cursor_at_end = cursor_positions.iter().any(|&pos| pos == line_end_pos);
+                    + line_len_chars.saturating_sub(1);
+                let cursor_at_end = cursor_positions.iter().any(|&pos| pos == line_end_pos || pos == line_view_offset + line_len_chars);
 
                 tracing::trace!(
                     "End-of-line check: line_start={}, char_index={}, line_end_pos={}, cursor_at_end={}, is_active={}",
@@ -1244,12 +1245,26 @@ impl SplitRenderer {
                                 .fg(theme.editor_fg)
                                 .bg(theme.inactive_cursor)
                         };
+                        let view_end_idx = line_view_offset + line_len_chars;
+                        // Attempt to derive source end byte from last mapped char
+                        if line_len_chars > 0 {
+                            let last_idx = view_end_idx.saturating_sub(1);
+                            if let Some(Some(src_last)) = view_mapping.get(last_idx) {
+                                if let Some(last_char) = line_content.chars().last() {
+                                    view_extra_sources.insert(
+                                        view_end_idx,
+                                        Some(src_last + last_char.len_utf8()),
+                                    );
+                                }
+                            }
+                        }
+
                         push_span_with_map(
                             &mut line_spans,
                             &mut line_view_map,
                             " ".to_string(),
                             cursor_style,
-                            Some(line_end_pos),
+                            Some(view_end_idx),
                         );
                     }
                     // Primary cursor at end of line will be shown by terminal hardware cursor (active split only)
@@ -1345,9 +1360,13 @@ impl SplitRenderer {
                                     );
                                     (screen_x, current_y)
                                 });
-                            if let Some(Some(src)) = view_mapping.get(*view_idx) {
-                                source_to_screen
-                                    .insert(*src, (screen_x, current_y));
+                            let src_opt = view_mapping
+                                .get(*view_idx)
+                                .copied()
+                                .flatten()
+                                .or_else(|| view_extra_sources.get(view_idx).copied().flatten());
+                            if let Some(src) = src_opt {
+                                source_to_screen.insert(src, (screen_x, current_y));
                             }
                         }
                     }
