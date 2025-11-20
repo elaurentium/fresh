@@ -85,9 +85,9 @@ The design envisions:
 **Current reality**: source → raw string (identity) OR plugin tokens, then renderer wraps during line construction. Plugins can't fully control text flow—no soft-break detection, no token-based wrapping.
 
 ## Next Steps
-1) **Unify token pipeline**: make identity view use token stream (`Text`/`Newline`/`Space` from source scan).
-2) **Wrapping transform**: move `wrap_line()` logic to transform stage; emit break tokens instead of wrapping during render.
-3) **Disable renderer wrapping**: when `view_transform` present, skip built-in wrap and rely on plugin breaks.
+1) ✅ ~~**Unify token pipeline**: make identity view use token stream (`Text`/`Newline`/`Space` from source scan).~~
+2) ✅ ~~**Wrapping transform**: move `wrap_line()` logic to transform stage; emit break tokens instead of wrapping during render.~~
+3) ✅ ~~**Disable renderer wrapping**: when `view_transform` present, skip built-in wrap and rely on plugin breaks.~~
 4) **Column guides**: render vertical lines at `compose_column_guides` positions.
 5) **Visual navigation**: bind up/down to visual-line movement in Compose mode.
 6) **Markdown plugin**: parse incrementally, rewrite paragraph newlines to spaces, emit structure styling, detect hard breaks.
