@@ -129,6 +129,8 @@ struct UiColors {
     scrollbar_thumb_hover_fg: ColorDef,
     #[serde(default = "default_compose_margin_bg")]
     compose_margin_bg: ColorDef,
+    #[serde(default = "default_semantic_highlight_bg")]
+    semantic_highlight_bg: ColorDef,
 }
 
 // Default menu colors (for backward compatibility with existing themes)
@@ -185,6 +187,9 @@ fn default_scrollbar_thumb_hover_fg() -> ColorDef {
 }
 fn default_compose_margin_bg() -> ColorDef {
     ColorDef::Rgb(18, 18, 18) // Darker than editor_bg for "desk" effect
+}
+fn default_semantic_highlight_bg() -> ColorDef {
+    ColorDef::Rgb(60, 60, 80) // Subtle dark highlight for word occurrences
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -290,6 +295,9 @@ pub struct Theme {
     // Compose mode colors
     pub compose_margin_bg: Color,
 
+    // Semantic highlighting (word under cursor)
+    pub semantic_highlight_bg: Color,
+
     // Search colors
     pub search_match_bg: Color,
     pub search_match_fg: Color,
@@ -369,6 +377,7 @@ impl From<ThemeFile> for Theme {
             scrollbar_track_hover_fg: file.ui.scrollbar_track_hover_fg.into(),
             scrollbar_thumb_hover_fg: file.ui.scrollbar_thumb_hover_fg.into(),
             compose_margin_bg: file.ui.compose_margin_bg.into(),
+            semantic_highlight_bg: file.ui.semantic_highlight_bg.into(),
             search_match_bg: file.search.match_bg.into(),
             search_match_fg: file.search.match_fg.into(),
             diagnostic_error_fg: file.diagnostic.error_fg.into(),
@@ -491,6 +500,9 @@ impl Theme {
             // Compose mode colors
             compose_margin_bg: Color::Rgb(18, 18, 18), // Darker than editor_bg for "desk" effect
 
+            // Semantic highlighting (word under cursor)
+            semantic_highlight_bg: Color::Rgb(60, 60, 80), // Subtle dark highlight
+
             // Search colors
             search_match_bg: Color::Rgb(100, 100, 20), // Yellow-brown highlight
             search_match_fg: Color::Rgb(255, 255, 255),
@@ -533,11 +545,11 @@ impl Theme {
             line_number_bg: Color::Rgb(255, 255, 255),
 
             // UI element colors
-            tab_active_fg: Color::Black,
-            tab_active_bg: Color::Cyan,
-            tab_inactive_fg: Color::Black,
-            tab_inactive_bg: Color::Gray,
-            tab_separator_bg: Color::White,
+            tab_active_fg: Color::Rgb(40, 40, 40),
+            tab_active_bg: Color::Rgb(255, 255, 255),
+            tab_inactive_fg: Color::Rgb(100, 100, 100),
+            tab_inactive_bg: Color::Rgb(230, 230, 230),
+            tab_separator_bg: Color::Rgb(200, 200, 200),
 
             // Menu bar colors
             menu_bg: Color::Rgb(240, 240, 240),
@@ -553,10 +565,10 @@ impl Theme {
             menu_hover_bg: Color::Rgb(220, 220, 220),
             menu_hover_fg: Color::Rgb(0, 0, 0),
 
-            status_bar_fg: Color::White,
-            status_bar_bg: Color::DarkGray,
-            prompt_fg: Color::White,
-            prompt_bg: Color::Black,
+            status_bar_fg: Color::Rgb(40, 40, 40),
+            status_bar_bg: Color::Rgb(230, 230, 230),
+            prompt_fg: Color::Rgb(40, 40, 40),
+            prompt_bg: Color::Rgb(250, 250, 250),
             prompt_selection_fg: Color::Black,
             prompt_selection_bg: Color::Rgb(173, 214, 255), // Light blue selection
 
@@ -580,13 +592,16 @@ impl Theme {
             split_separator_hover_fg: Color::Rgb(70, 130, 180), // Steel blue
 
             // Scrollbar colors
-            scrollbar_track_fg: Color::Gray,
-            scrollbar_thumb_fg: Color::DarkGray,
-            scrollbar_track_hover_fg: Color::DarkGray,
-            scrollbar_thumb_hover_fg: Color::Black,
+            scrollbar_track_fg: Color::Rgb(220, 220, 220),
+            scrollbar_thumb_fg: Color::Rgb(180, 180, 180),
+            scrollbar_track_hover_fg: Color::Rgb(200, 200, 200),
+            scrollbar_thumb_hover_fg: Color::Rgb(140, 140, 140),
 
             // Compose mode colors
             compose_margin_bg: Color::Rgb(220, 220, 225), // Slightly darker than white for "desk" effect
+
+            // Semantic highlighting (word under cursor)
+            semantic_highlight_bg: Color::Rgb(220, 230, 240), // Subtle light blue highlight
 
             // Search colors
             search_match_bg: Color::Rgb(255, 255, 150), // Light yellow highlight
@@ -685,6 +700,9 @@ impl Theme {
             // Compose mode colors
             compose_margin_bg: Color::Rgb(10, 10, 10), // Very dark for high contrast "desk" effect
 
+            // Semantic highlighting (word under cursor)
+            semantic_highlight_bg: Color::Rgb(0, 60, 100), // Bright blue highlight for visibility
+
             // Search colors
             search_match_bg: Color::Yellow,
             search_match_fg: Color::Black,
@@ -725,20 +743,114 @@ impl Theme {
         match normalized_name.as_str() {
             "light" => Self::light(),
             "high-contrast" => Self::high_contrast(),
+            "nostalgia" => Self::nostalgia(),
             _ => Self::dark(),
         }
     }
 
     /// Get all available theme names
     pub fn available_themes() -> Vec<&'static str> {
-        vec![
-            "dark",
-            "light",
-            "high-contrast",
-            "nord",
-            "dracula",
-            "solarized-dark",
-        ]
+        vec!["dark", "light", "high-contrast", "nostalgia"]
+    }
+
+    /// Nostalgia theme (Turbo Pascal 5 / WordPerfect 5 inspired)
+    pub fn nostalgia() -> Self {
+        Self {
+            name: "nostalgia".to_string(),
+
+            // Editor colors - classic blue background with yellow/white text
+            editor_bg: Color::Rgb(0, 0, 170),   // Classic DOS blue
+            editor_fg: Color::Rgb(255, 255, 85), // Bright yellow
+            cursor: Color::Rgb(255, 255, 255),  // White block cursor
+            inactive_cursor: Color::Rgb(170, 170, 170),
+            selection_bg: Color::Rgb(170, 170, 170), // Gray selection
+            current_line_bg: Color::Rgb(0, 0, 128),  // Slightly darker blue
+            line_number_fg: Color::Rgb(85, 255, 255), // Cyan
+            line_number_bg: Color::Rgb(0, 0, 170),
+
+            // UI element colors
+            tab_active_fg: Color::Rgb(0, 0, 0),
+            tab_active_bg: Color::Rgb(170, 170, 170),
+            tab_inactive_fg: Color::Rgb(255, 255, 85),
+            tab_inactive_bg: Color::Rgb(0, 0, 128),
+            tab_separator_bg: Color::Rgb(0, 0, 170),
+
+            // Menu bar colors - classic DOS menu style
+            menu_bg: Color::Rgb(170, 170, 170),
+            menu_fg: Color::Rgb(0, 0, 0),
+            menu_active_bg: Color::Rgb(0, 170, 0),
+            menu_active_fg: Color::Rgb(255, 255, 255),
+            menu_dropdown_bg: Color::Rgb(170, 170, 170),
+            menu_dropdown_fg: Color::Rgb(0, 0, 0),
+            menu_highlight_bg: Color::Rgb(0, 170, 0), // Green highlight
+            menu_highlight_fg: Color::Rgb(255, 255, 255),
+            menu_border_fg: Color::Rgb(0, 0, 0),
+            menu_separator_fg: Color::Rgb(85, 85, 85),
+            menu_hover_bg: Color::Rgb(0, 170, 0),
+            menu_hover_fg: Color::Rgb(255, 255, 255),
+
+            status_bar_fg: Color::Rgb(0, 0, 0),
+            status_bar_bg: Color::Rgb(0, 170, 170), // Cyan status bar
+            prompt_fg: Color::Rgb(255, 255, 255),
+            prompt_bg: Color::Rgb(0, 0, 128),
+            prompt_selection_fg: Color::Rgb(0, 0, 0),
+            prompt_selection_bg: Color::Rgb(170, 170, 170),
+
+            popup_border_fg: Color::Rgb(255, 255, 255),
+            popup_bg: Color::Rgb(0, 0, 170),
+            popup_selection_bg: Color::Rgb(0, 170, 0),
+            popup_text_fg: Color::Rgb(255, 255, 85),
+
+            suggestion_bg: Color::Rgb(0, 0, 170),
+            suggestion_selected_bg: Color::Rgb(0, 170, 0),
+
+            help_bg: Color::Rgb(0, 0, 170),
+            help_fg: Color::Rgb(255, 255, 85),
+            help_key_fg: Color::Rgb(85, 255, 255),
+            help_separator_fg: Color::Rgb(170, 170, 170),
+
+            help_indicator_fg: Color::Rgb(255, 85, 85),
+            help_indicator_bg: Color::Rgb(0, 0, 170),
+
+            split_separator_fg: Color::Rgb(85, 255, 255),
+            split_separator_hover_fg: Color::Rgb(255, 255, 255),
+
+            // Scrollbar colors
+            scrollbar_track_fg: Color::Rgb(0, 0, 128),
+            scrollbar_thumb_fg: Color::Rgb(170, 170, 170),
+            scrollbar_track_hover_fg: Color::Rgb(0, 0, 128),
+            scrollbar_thumb_hover_fg: Color::Rgb(255, 255, 255),
+
+            // Compose mode colors
+            compose_margin_bg: Color::Rgb(0, 0, 128), // Darker blue for margins
+
+            // Semantic highlighting (word under cursor)
+            semantic_highlight_bg: Color::Rgb(0, 85, 170), // Lighter blue highlight
+
+            // Search colors
+            search_match_bg: Color::Rgb(170, 85, 0), // Orange/brown
+            search_match_fg: Color::Rgb(255, 255, 255),
+
+            // Diagnostic colors
+            diagnostic_error_fg: Color::Rgb(255, 85, 85),
+            diagnostic_error_bg: Color::Rgb(128, 0, 0),
+            diagnostic_warning_fg: Color::Rgb(255, 255, 85),
+            diagnostic_warning_bg: Color::Rgb(128, 128, 0),
+            diagnostic_info_fg: Color::Rgb(85, 255, 255),
+            diagnostic_info_bg: Color::Rgb(0, 85, 128),
+            diagnostic_hint_fg: Color::Rgb(170, 170, 170),
+            diagnostic_hint_bg: Color::Rgb(0, 0, 128),
+
+            // Syntax highlighting colors (Turbo Pascal style)
+            syntax_keyword: Color::Rgb(255, 255, 255), // White keywords
+            syntax_string: Color::Rgb(85, 255, 255),   // Cyan strings
+            syntax_comment: Color::Rgb(170, 170, 170), // Gray comments
+            syntax_function: Color::Rgb(255, 255, 85), // Yellow functions
+            syntax_type: Color::Rgb(85, 255, 85),      // Green types
+            syntax_variable: Color::Rgb(255, 255, 85), // Yellow variables
+            syntax_constant: Color::Rgb(255, 85, 255), // Magenta constants
+            syntax_operator: Color::Rgb(255, 255, 255), // White operators
+        }
     }
 }
 
@@ -779,13 +891,11 @@ mod tests {
     #[test]
     fn test_available_themes() {
         let themes = Theme::available_themes();
-        assert_eq!(themes.len(), 6);
+        assert_eq!(themes.len(), 4);
         assert!(themes.contains(&"dark"));
         assert!(themes.contains(&"light"));
         assert!(themes.contains(&"high-contrast"));
-        assert!(themes.contains(&"nord"));
-        assert!(themes.contains(&"dracula"));
-        assert!(themes.contains(&"solarized-dark"));
+        assert!(themes.contains(&"nostalgia"));
     }
 
     #[test]

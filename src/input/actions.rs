@@ -1692,6 +1692,7 @@ pub fn action_to_events(
         | Action::None
         | Action::ScrollTabsLeft
         | Action::ScrollTabsRight
+        | Action::SelectTheme
         | Action::Revert
         | Action::ToggleAutoRevert => return None,
 

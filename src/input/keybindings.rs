@@ -241,6 +241,7 @@ pub enum Action {
     ToggleLineWrap,
     ToggleComposeMode,
     SetComposeWidth,
+    SelectTheme,
 
     // Buffer navigation
     NextBuffer,
@@ -611,6 +612,7 @@ impl Action {
             "toggle_mouse_capture" => Some(Action::ToggleMouseCapture),
             "set_background" => Some(Action::SetBackground),
             "set_background_blend" => Some(Action::SetBackgroundBlend),
+            "select_theme" => Some(Action::SelectTheme),
 
             "dump_config" => Some(Action::DumpConfig),
 
@@ -1390,6 +1392,7 @@ impl KeybindingResolver {
             Action::PluginAction(name) => format!("Plugin action: {}", name),
             Action::ScrollTabsLeft => "Scroll tabs left".to_string(),
             Action::ScrollTabsRight => "Scroll tabs right".to_string(),
+            Action::SelectTheme => "Select theme".to_string(),
             Action::None => "No action".to_string(),
         }
     }

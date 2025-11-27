@@ -53,6 +53,8 @@ pub enum PromptType {
     SetComposeWidth,
     /// Stop a running LSP server (select from list)
     StopLspServer,
+    /// Select a theme (select from list)
+    SelectTheme,
     /// Confirm reverting a modified file
     ConfirmRevert,
     /// Confirm saving over a file that changed on disk

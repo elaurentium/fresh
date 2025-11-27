@@ -774,6 +774,14 @@ impl Config {
                     },
                     MenuItem::Separator { separator: true },
                     MenuItem::Action {
+                        label: "Select Theme...".to_string(),
+                        action: "select_theme".to_string(),
+                        args: HashMap::new(),
+                        when: None,
+                        checkbox: None,
+                    },
+                    MenuItem::Separator { separator: true },
+                    MenuItem::Action {
                         label: "Split Horizontal".to_string(),
                         action: "split_horizontal".to_string(),
                         args: HashMap::new(),

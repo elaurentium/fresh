@@ -605,6 +605,13 @@ pub fn get_all_commands() -> Vec<Command> {
             action: Action::ToggleInlayHints,
             contexts: vec![KeyContext::Normal],
         },
+        // Theme selection
+        Command {
+            name: "Select Theme".to_string(),
+            description: "Choose a color theme for the editor".to_string(),
+            action: Action::SelectTheme,
+            contexts: vec![],
+        },
         // Keybinding map switching
         Command {
             name: "Switch to Default Keybindings".to_string(),

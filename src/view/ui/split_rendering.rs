@@ -1555,12 +1555,16 @@ impl SplitRenderer {
         viewport_start: usize,
         viewport_end: usize,
         primary_cursor_position: usize,
+        theme: &crate::view::theme::Theme,
     ) -> DecorationContext {
         let highlight_spans = if let Some(highlighter) = &mut state.highlighter {
             highlighter.highlight_viewport(&state.buffer, viewport_start, viewport_end)
         } else {
             Vec::new()
         };
+
+        // Update semantic highlighter color from theme
+        state.semantic_highlighter.highlight_color = theme.semantic_highlight_bg;
 
         let semantic_spans = state.semantic_highlighter.highlight_occurrences(
             &state.buffer,
@@ -2350,6 +2354,7 @@ impl SplitRenderer {
             viewport_start,
             viewport_end,
             selection.primary_cursor_position,
+            theme,
         );
 
         // Apply top_view_line_offset to skip virtual lines when scrolling through them
@@ -2601,16 +2606,18 @@ mod tests {
             content.len().max(1),
             visible_count,
         );
+        let theme = Theme::default();
         let decorations = SplitRenderer::decoration_context(
             &mut state,
             viewport_start,
             viewport_end,
             selection.primary_cursor_position,
+            &theme,
         );
 
         let output = SplitRenderer::render_view_lines(LineRenderInput {
             state: &state,
-            theme: &Theme::default(),
+            theme: &theme,
             view_lines: &view_data.lines,
             view_anchor,
             render_area,

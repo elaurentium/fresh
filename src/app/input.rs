@@ -942,6 +942,9 @@ impl Editor {
             Action::DumpConfig => {
                 self.dump_config();
             }
+            Action::SelectTheme => {
+                self.start_select_theme_prompt();
+            }
             Action::Search => {
                 // If already in a search-related prompt, Ctrl+F acts like Enter (confirm search)
                 let is_search_prompt = self.prompt.as_ref().is_some_and(|p| {
@@ -1829,6 +1832,9 @@ impl Editor {
                                     }
                                 }
                             }
+                        }
+                        PromptType::SelectTheme => {
+                            self.apply_theme(input.trim());
                         }
                     }
                 }
@@ -3322,5 +3328,48 @@ impl Editor {
         }
 
         Ok(())
+    }
+
+    /// Start the theme selection prompt with available themes
+    fn start_select_theme_prompt(&mut self) {
+        let available_themes = crate::view::theme::Theme::available_themes();
+
+        let suggestions: Vec<crate::input::commands::Suggestion> = available_themes
+            .iter()
+            .map(|theme_name| {
+                let is_current = self.theme.name == *theme_name;
+                crate::input::commands::Suggestion {
+                    text: theme_name.to_string(),
+                    description: if is_current {
+                        Some("(current)".to_string())
+                    } else {
+                        None
+                    },
+                    value: Some(theme_name.to_string()),
+                    disabled: false,
+                    keybinding: None,
+                }
+            })
+            .collect();
+
+        self.prompt = Some(crate::view::prompt::Prompt::with_suggestions(
+            "Select theme: ".to_string(),
+            PromptType::SelectTheme,
+            suggestions,
+        ));
+
+        if let Some(prompt) = self.prompt.as_mut() {
+            if !prompt.suggestions.is_empty() {
+                prompt.selected_suggestion = Some(0);
+            }
+        }
+    }
+
+    /// Apply a theme by name
+    fn apply_theme(&mut self, theme_name: &str) {
+        if !theme_name.is_empty() {
+            self.theme = crate::view::theme::Theme::from_name(theme_name);
+            self.set_status_message(format!("Theme changed to '{}'", self.theme.name));
+        }
     }
 }
