@@ -5177,6 +5177,102 @@ impl Editor {
         Ok(())
     }
 
+    /// Apply LSP text edits to a buffer and return the number of changes made.
+    /// Edits are sorted in reverse order and applied as a batch.
+    fn apply_lsp_text_edits(
+        &mut self,
+        buffer_id: BufferId,
+        mut edits: Vec<lsp_types::TextEdit>,
+    ) -> io::Result<usize> {
+        if edits.is_empty() {
+            return Ok(0);
+        }
+
+        // Sort edits by position (reverse order to avoid offset issues)
+        edits.sort_by(|a, b| {
+            b.range
+                .start
+                .line
+                .cmp(&a.range.start.line)
+                .then(b.range.start.character.cmp(&a.range.start.character))
+        });
+
+        // Collect all events for this buffer into a batch
+        let mut batch_events = Vec::new();
+        let mut changes = 0;
+
+        // Create events for all edits
+        for edit in edits {
+            let state = self.buffers.get_mut(&buffer_id).ok_or_else(|| {
+                io::Error::new(io::ErrorKind::NotFound, "Buffer not found")
+            })?;
+
+            // Convert LSP range to byte positions
+            let start_line = edit.range.start.line as usize;
+            let start_char = edit.range.start.character as usize;
+            let end_line = edit.range.end.line as usize;
+            let end_char = edit.range.end.character as usize;
+
+            let start_pos = state.buffer.lsp_position_to_byte(start_line, start_char);
+            let end_pos = state.buffer.lsp_position_to_byte(end_line, end_char);
+            let buffer_len = state.buffer.len();
+
+            // Log the conversion for debugging
+            let old_text = if start_pos < end_pos && end_pos <= buffer_len {
+                state.get_text_range(start_pos, end_pos)
+            } else {
+                format!(
+                    "<invalid range: start={}, end={}, buffer_len={}>",
+                    start_pos, end_pos, buffer_len
+                )
+            };
+            tracing::debug!(
+                "  Converting LSP range line {}:{}-{}:{} to bytes {}..{} (replacing {:?} with {:?})",
+                start_line, start_char, end_line, end_char,
+                start_pos, end_pos, old_text, edit.new_text
+            );
+
+            // Delete old text
+            if start_pos < end_pos {
+                let deleted_text = state.get_text_range(start_pos, end_pos);
+                let cursor_id = state.cursors.primary_id();
+                let delete_event = Event::Delete {
+                    range: start_pos..end_pos,
+                    deleted_text,
+                    cursor_id,
+                };
+                batch_events.push(delete_event);
+            }
+
+            // Insert new text
+            if !edit.new_text.is_empty() {
+                let state = self.buffers.get(&buffer_id).ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::NotFound, "Buffer not found")
+                })?;
+                let cursor_id = state.cursors.primary_id();
+                let insert_event = Event::Insert {
+                    position: start_pos,
+                    text: edit.new_text.clone(),
+                    cursor_id,
+                };
+                batch_events.push(insert_event);
+            }
+
+            changes += 1;
+        }
+
+        // Create a batch event for all rename changes
+        if !batch_events.is_empty() {
+            let batch = Event::Batch {
+                events: batch_events,
+                description: "LSP Rename".to_string(),
+            };
+            self.apply_rename_batch_to_buffer(buffer_id, batch)?;
+        }
+
+        Ok(changes)
+    }
+
     /// Handle rename response from LSP
     pub fn handle_rename_response(
         &mut self,
@@ -5205,91 +5301,8 @@ impl Editor {
                 if let Some(changes) = workspace_edit.changes {
                     for (uri, edits) in changes {
                         if let Ok(path) = uri_to_path(&uri) {
-                            // Open the file if not already open
                             let buffer_id = self.open_file(&path)?;
-
-                            // Sort edits by position (reverse order to avoid offset issues)
-                            let mut sorted_edits = edits;
-                            sorted_edits.sort_by(|a, b| {
-                                b.range
-                                    .start
-                                    .line
-                                    .cmp(&a.range.start.line)
-                                    .then(b.range.start.character.cmp(&a.range.start.character))
-                            });
-
-                            // Collect all events for this buffer into a batch
-                            let mut batch_events = Vec::new();
-
-                            // Create events for all edits
-                            for edit in sorted_edits {
-                                let state = self.buffers.get_mut(&buffer_id).ok_or_else(|| {
-                                    io::Error::new(io::ErrorKind::NotFound, "Buffer not found")
-                                })?;
-
-                                // Convert LSP range to byte positions
-                                // LSP uses UTF-16 code units, not byte offsets
-                                let start_line = edit.range.start.line as usize;
-                                let start_char = edit.range.start.character as usize;
-                                let end_line = edit.range.end.line as usize;
-                                let end_char = edit.range.end.character as usize;
-
-                                let start_pos =
-                                    state.buffer.lsp_position_to_byte(start_line, start_char);
-                                let end_pos = state.buffer.lsp_position_to_byte(end_line, end_char);
-                                let buffer_len = state.buffer.len();
-
-                                // Log the conversion for debugging
-                                let old_text = if start_pos < end_pos && end_pos <= buffer_len {
-                                    state.get_text_range(start_pos, end_pos)
-                                } else {
-                                    format!(
-                                        "<invalid range: start={}, end={}, buffer_len={}>",
-                                        start_pos, end_pos, buffer_len
-                                    )
-                                };
-                                tracing::debug!("  Converting LSP range line {}:{}-{}:{} to bytes {}..{} (replacing {:?} with {:?})",
-                                    start_line, start_char, end_line, end_char,
-                                    start_pos, end_pos, old_text, edit.new_text);
-
-                                // Delete old text
-                                if start_pos < end_pos {
-                                    let deleted_text = state.get_text_range(start_pos, end_pos);
-                                    let cursor_id = state.cursors.primary_id();
-                                    let delete_event = Event::Delete {
-                                        range: start_pos..end_pos,
-                                        deleted_text,
-                                        cursor_id,
-                                    };
-                                    batch_events.push(delete_event);
-                                }
-
-                                // Insert new text
-                                if !edit.new_text.is_empty() {
-                                    let state = self.buffers.get(&buffer_id).ok_or_else(|| {
-                                        io::Error::new(io::ErrorKind::NotFound, "Buffer not found")
-                                    })?;
-                                    let cursor_id = state.cursors.primary_id();
-                                    let insert_event = Event::Insert {
-                                        position: start_pos,
-                                        text: edit.new_text.clone(),
-                                        cursor_id,
-                                    };
-                                    batch_events.push(insert_event);
-                                }
-
-                                total_changes += 1;
-                            }
-
-                            // Create a batch event for all rename changes
-                            if !batch_events.is_empty() {
-                                let batch = Event::Batch {
-                                    events: batch_events,
-                                    description: "LSP Rename".to_string(),
-                                };
-
-                                self.apply_rename_batch_to_buffer(buffer_id, batch)?;
-                            }
+                            total_changes += self.apply_lsp_text_edits(buffer_id, edits)?;
                         }
                     }
                 }
@@ -5319,7 +5332,6 @@ impl Editor {
                         let uri = text_doc_edit.text_document.uri;
 
                         if let Ok(path) = uri_to_path(&uri) {
-                            // Open the file if not already open
                             let buffer_id = self.open_file(&path)?;
 
                             // Extract TextEdit from OneOf<TextEdit, AnnotatedTextEdit>
@@ -5350,88 +5362,7 @@ impl Editor {
                                 );
                             }
 
-                            // Sort edits by position (reverse order to avoid offset issues)
-                            let mut sorted_edits = edits;
-                            sorted_edits.sort_by(|a, b| {
-                                b.range
-                                    .start
-                                    .line
-                                    .cmp(&a.range.start.line)
-                                    .then(b.range.start.character.cmp(&a.range.start.character))
-                            });
-
-                            // Collect all events for this buffer into a batch
-                            let mut batch_events = Vec::new();
-
-                            // Create events for all edits
-                            for edit in sorted_edits {
-                                let state = self.buffers.get_mut(&buffer_id).ok_or_else(|| {
-                                    io::Error::new(io::ErrorKind::NotFound, "Buffer not found")
-                                })?;
-
-                                // Convert LSP range to byte positions
-                                // LSP uses UTF-16 code units, not byte offsets
-                                let start_line = edit.range.start.line as usize;
-                                let start_char = edit.range.start.character as usize;
-                                let end_line = edit.range.end.line as usize;
-                                let end_char = edit.range.end.character as usize;
-
-                                let start_pos =
-                                    state.buffer.lsp_position_to_byte(start_line, start_char);
-                                let end_pos = state.buffer.lsp_position_to_byte(end_line, end_char);
-                                let buffer_len = state.buffer.len();
-
-                                // Log the conversion for debugging
-                                let old_text = if start_pos < end_pos && end_pos <= buffer_len {
-                                    state.get_text_range(start_pos, end_pos)
-                                } else {
-                                    format!(
-                                        "<invalid range: start={}, end={}, buffer_len={}>",
-                                        start_pos, end_pos, buffer_len
-                                    )
-                                };
-                                tracing::debug!("  Converting LSP range line {}:{}-{}:{} to bytes {}..{} (replacing {:?} with {:?})",
-                                    start_line, start_char, end_line, end_char,
-                                    start_pos, end_pos, old_text, edit.new_text);
-
-                                // Delete old text
-                                if start_pos < end_pos {
-                                    let deleted_text = state.get_text_range(start_pos, end_pos);
-                                    let cursor_id = state.cursors.primary_id();
-                                    let delete_event = Event::Delete {
-                                        range: start_pos..end_pos,
-                                        deleted_text,
-                                        cursor_id,
-                                    };
-                                    batch_events.push(delete_event);
-                                }
-
-                                // Insert new text
-                                if !edit.new_text.is_empty() {
-                                    let state = self.buffers.get(&buffer_id).ok_or_else(|| {
-                                        io::Error::new(io::ErrorKind::NotFound, "Buffer not found")
-                                    })?;
-                                    let cursor_id = state.cursors.primary_id();
-                                    let insert_event = Event::Insert {
-                                        position: start_pos,
-                                        text: edit.new_text.clone(),
-                                        cursor_id,
-                                    };
-                                    batch_events.push(insert_event);
-                                }
-
-                                total_changes += 1;
-                            }
-
-                            // Create a batch event for all rename changes
-                            if !batch_events.is_empty() {
-                                let batch = Event::Batch {
-                                    events: batch_events,
-                                    description: "LSP Rename".to_string(),
-                                };
-
-                                self.apply_rename_batch_to_buffer(buffer_id, batch)?;
-                            }
+                            total_changes += self.apply_lsp_text_edits(buffer_id, edits)?;
                         }
                     }
                 }
