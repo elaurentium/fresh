@@ -14,6 +14,7 @@ pub mod git;
 pub mod large_file_mode;
 pub mod lifecycle;
 pub mod line_wrapping;
+pub mod live_grep;
 pub mod lsp;
 pub mod margin;
 pub mod markdown_compose;
