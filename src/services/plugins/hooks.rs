@@ -129,6 +129,12 @@ pub enum HookArgs {
     /// Prompt was cancelled (user pressed Escape/Ctrl+G)
     PromptCancelled { prompt_type: String, input: String },
 
+    /// Prompt suggestion selection changed (user navigated with Up/Down)
+    PromptSelectionChanged {
+        prompt_type: String,
+        selected_index: usize,
+    },
+
     /// Request keyboard shortcuts data (key, action) for the help buffer
     KeyboardShortcuts { bindings: Vec<(String, String)> },
 
@@ -442,6 +448,15 @@ pub fn hook_args_to_json(args: &HookArgs) -> Result<String> {
             serde_json::json!({
                 "prompt_type": prompt_type,
                 "input": input,
+            })
+        }
+        HookArgs::PromptSelectionChanged {
+            prompt_type,
+            selected_index,
+        } => {
+            serde_json::json!({
+                "prompt_type": prompt_type,
+                "selected_index": selected_index,
             })
         }
         HookArgs::KeyboardShortcuts { bindings } => {

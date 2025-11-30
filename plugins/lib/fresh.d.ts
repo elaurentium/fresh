@@ -183,6 +183,12 @@ interface TextPropertyEntry {
   properties: Record<string, unknown>;
 }
 
+/** Result from createVirtualBufferInSplit */
+interface CreateVirtualBufferResult {
+  buffer_id: number;
+  split_id?: number | null;
+}
+
 /** Configuration for createVirtualBufferInSplit */
 interface CreateVirtualBufferOptions {
   /** Buffer name shown in status bar (convention: "*Name*") */
@@ -829,7 +835,7 @@ interface EditorAPI {
    * panel_id: "search"
    * });
    */
-  createVirtualBufferInSplit(options: CreateVirtualBufferOptions): Promise<number>;
+  createVirtualBufferInSplit(options: CreateVirtualBufferOptions): Promise<CreateVirtualBufferResult>;
   /**
    * Create a virtual buffer in an existing split
    * @param options - Configuration for the virtual buffer

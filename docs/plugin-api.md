@@ -212,6 +212,17 @@ interface TextPropertyEntry {
 | `text` | Text to display. Include trailing newline for separate lines. |
 | `properties` | Arbitrary metadata queryable via getTextPropertiesAtCursor. |
 
+### CreateVirtualBufferResult
+
+Result from createVirtualBufferInSplit
+
+```typescript
+interface CreateVirtualBufferResult {
+  buffer_id: number;
+  split_id?: number | null;
+}
+```
+
 ### CreateVirtualBufferOptions
 
 Configuration for createVirtualBufferInSplit
@@ -1371,7 +1382,7 @@ panel_id: "search"
 });
 
 ```typescript
-createVirtualBufferInSplit(options: CreateVirtualBufferOptions): Promise<number>
+createVirtualBufferInSplit(options: CreateVirtualBufferOptions): Promise<CreateVirtualBufferResult>
 ```
 
 **Parameters:**

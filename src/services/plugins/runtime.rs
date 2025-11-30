@@ -1807,6 +1807,13 @@ struct TsTextPropertyEntry {
     properties: std::collections::HashMap<String, serde_json::Value>,
 }
 
+/// Result from createVirtualBufferInSplit
+#[derive(serde::Serialize)]
+struct CreateVirtualBufferResult {
+    buffer_id: u32,
+    split_id: Option<u32>,
+}
+
 /// Configuration for createVirtualBufferInSplit
 #[derive(serde::Deserialize)]
 struct CreateVirtualBufferOptions {
@@ -1857,10 +1864,11 @@ struct CreateVirtualBufferOptions {
 ///   panel_id: "search"
 /// });
 #[op2(async)]
+#[serde]
 async fn op_fresh_create_virtual_buffer_in_split(
     state: Rc<RefCell<OpState>>,
     #[serde] options: CreateVirtualBufferOptions,
-) -> Result<u32, deno_core::error::AnyError> {
+) -> Result<CreateVirtualBufferResult, deno_core::error::AnyError> {
     // Get runtime state and create oneshot channel
     let receiver = {
         let state = state.borrow();
@@ -1927,11 +1935,16 @@ async fn op_fresh_create_virtual_buffer_in_split(
         .await
         .map_err(|_| deno_core::error::generic_error("Response channel closed"))?;
 
-    // Extract buffer ID from response
+    // Extract buffer ID and split ID from response
     match response {
         crate::services::plugins::api::PluginResponse::VirtualBufferCreated {
-            buffer_id, ..
-        } => Ok(buffer_id.0 as u32),
+            buffer_id,
+            split_id,
+            ..
+        } => Ok(CreateVirtualBufferResult {
+            buffer_id: buffer_id.0 as u32,
+            split_id: split_id.map(|s| s.0 as u32),
+        }),
         _ => Err(deno_core::error::generic_error(
             "Unexpected plugin response for virtual buffer creation",
         )),

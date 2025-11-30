@@ -18,10 +18,11 @@ use std::sync::{Arc, RwLock};
 /// Response from the editor for async plugin operations
 #[derive(Debug, Clone)]
 pub enum PluginResponse {
-    /// Response to CreateVirtualBufferInSplit with the created buffer ID
+    /// Response to CreateVirtualBufferInSplit with the created buffer ID and split ID
     VirtualBufferCreated {
         request_id: u64,
         buffer_id: BufferId,
+        split_id: Option<SplitId>,
     },
     /// Response to a plugin-initiated LSP request
     LspRequest {

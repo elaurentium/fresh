@@ -236,10 +236,22 @@ impl Editor {
                             // Don't wrap around - stay at 0 if already at the beginning
                             let new_selected = if selected == 0 { 0 } else { selected - 1 };
                             prompt.selected_suggestion = Some(new_selected);
-                            // Update input to match selected suggestion
-                            if let Some(suggestion) = prompt.suggestions.get(new_selected) {
-                                prompt.input = suggestion.get_value().to_string();
-                                prompt.cursor_pos = prompt.input.len();
+                            // Update input to match selected suggestion (but not for plugin prompts)
+                            if !matches!(prompt.prompt_type, PromptType::Plugin { .. }) {
+                                if let Some(suggestion) = prompt.suggestions.get(new_selected) {
+                                    prompt.input = suggestion.get_value().to_string();
+                                    prompt.cursor_pos = prompt.input.len();
+                                }
+                            }
+                            // Fire selection changed hook for plugin prompts
+                            if let PromptType::Plugin { ref custom_type } = prompt.prompt_type {
+                                let hook_args = HookArgs::PromptSelectionChanged {
+                                    prompt_type: custom_type.clone(),
+                                    selected_index: new_selected,
+                                };
+                                if let Some(ref ts_manager) = self.ts_plugin_manager {
+                                    ts_manager.run_hook("prompt_selection_changed", hook_args);
+                                }
                             }
                         }
                     } else {
@@ -287,10 +299,22 @@ impl Editor {
                             // Don't wrap around - stay at the end if already at the last item
                             let new_selected = (selected + 1).min(prompt.suggestions.len() - 1);
                             prompt.selected_suggestion = Some(new_selected);
-                            // Update input to match selected suggestion
-                            if let Some(suggestion) = prompt.suggestions.get(new_selected) {
-                                prompt.input = suggestion.get_value().to_string();
-                                prompt.cursor_pos = prompt.input.len();
+                            // Update input to match selected suggestion (but not for plugin prompts)
+                            if !matches!(prompt.prompt_type, PromptType::Plugin { .. }) {
+                                if let Some(suggestion) = prompt.suggestions.get(new_selected) {
+                                    prompt.input = suggestion.get_value().to_string();
+                                    prompt.cursor_pos = prompt.input.len();
+                                }
+                            }
+                            // Fire selection changed hook for plugin prompts
+                            if let PromptType::Plugin { ref custom_type } = prompt.prompt_type {
+                                let hook_args = HookArgs::PromptSelectionChanged {
+                                    prompt_type: custom_type.clone(),
+                                    selected_index: new_selected,
+                                };
+                                if let Some(ref ts_manager) = self.ts_plugin_manager {
+                                    ts_manager.run_hook("prompt_selection_changed", hook_args);
+                                }
                             }
                         }
                     } else {
