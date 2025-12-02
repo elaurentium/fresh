@@ -58,6 +58,67 @@ pub fn format_keybinding(keycode: &KeyCode, modifiers: &KeyModifiers) -> String 
     result
 }
 
+/// Returns terminal key equivalents for a given key combination.
+///
+/// Some key combinations are sent differently by terminals:
+/// - Ctrl+/ is often sent as Ctrl+7
+/// - Ctrl+Backspace is often sent as Ctrl+H
+/// - Ctrl+Space is often sent as Ctrl+@ (NUL)
+/// - Ctrl+[ is often sent as Escape
+///
+/// This function returns any equivalent key combinations that should be
+/// treated as aliases for the given key.
+pub fn terminal_key_equivalents(
+    key: KeyCode,
+    modifiers: KeyModifiers,
+) -> Vec<(KeyCode, KeyModifiers)> {
+    let mut equivalents = Vec::new();
+
+    // Only consider equivalents when Ctrl is pressed
+    if modifiers.contains(KeyModifiers::CONTROL) {
+        let base_modifiers = modifiers; // Keep all modifiers including Ctrl
+
+        match key {
+            // Ctrl+/ is often sent as Ctrl+7
+            KeyCode::Char('/') => {
+                equivalents.push((KeyCode::Char('7'), base_modifiers));
+            }
+            KeyCode::Char('7') => {
+                equivalents.push((KeyCode::Char('/'), base_modifiers));
+            }
+
+            // Ctrl+Backspace is often sent as Ctrl+H
+            KeyCode::Backspace => {
+                equivalents.push((KeyCode::Char('h'), base_modifiers));
+            }
+            KeyCode::Char('h') if modifiers == KeyModifiers::CONTROL => {
+                // Only add Backspace equivalent for plain Ctrl+H (not Ctrl+Shift+H etc.)
+                equivalents.push((KeyCode::Backspace, base_modifiers));
+            }
+
+            // Ctrl+Space is often sent as Ctrl+@ (NUL character, code 0)
+            KeyCode::Char(' ') => {
+                equivalents.push((KeyCode::Char('@'), base_modifiers));
+            }
+            KeyCode::Char('@') => {
+                equivalents.push((KeyCode::Char(' '), base_modifiers));
+            }
+
+            // Ctrl+- is often sent as Ctrl+_
+            KeyCode::Char('-') => {
+                equivalents.push((KeyCode::Char('_'), base_modifiers));
+            }
+            KeyCode::Char('_') => {
+                equivalents.push((KeyCode::Char('-'), base_modifiers));
+            }
+
+            _ => {}
+        }
+    }
+
+    equivalents
+}
+
 /// Context in which a keybinding is active
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum KeyContext {
@@ -731,11 +792,62 @@ impl KeybindingResolver {
                 } else if let Some(key_code) = Self::parse_key(&binding.key) {
                     // Single key binding (legacy format)
                     let modifiers = Self::parse_modifiers(&binding.modifiers);
-                    self.default_bindings
-                        .entry(context)
-                        .or_insert_with(HashMap::new)
-                        .insert((key_code, modifiers), action);
+
+                    // Insert the primary binding
+                    self.insert_binding_with_equivalents(
+                        context,
+                        key_code,
+                        modifiers,
+                        action,
+                        &binding.key,
+                    );
                 }
+            }
+        }
+    }
+
+    /// Insert a binding and automatically add terminal key equivalents.
+    /// Logs a warning if an equivalent key is already bound to a different action.
+    fn insert_binding_with_equivalents(
+        &mut self,
+        context: KeyContext,
+        key_code: KeyCode,
+        modifiers: KeyModifiers,
+        action: Action,
+        key_name: &str,
+    ) {
+        let context_bindings = self
+            .default_bindings
+            .entry(context)
+            .or_insert_with(HashMap::new);
+
+        // Insert the primary binding
+        context_bindings.insert((key_code, modifiers), action.clone());
+
+        // Get terminal key equivalents and add them as aliases
+        let equivalents = terminal_key_equivalents(key_code, modifiers);
+        for (equiv_key, equiv_mods) in equivalents {
+            // Check if this equivalent is already bound
+            if let Some(existing_action) = context_bindings.get(&(equiv_key, equiv_mods)) {
+                // Only warn if bound to a DIFFERENT action
+                if existing_action != &action {
+                    let equiv_name = format!("{:?}", equiv_key);
+                    tracing::warn!(
+                        "Terminal key equivalent conflict in {:?} context: {} (equivalent of {}) \
+                         is bound to {:?}, but {} is bound to {:?}. \
+                         The explicit binding takes precedence.",
+                        context,
+                        equiv_name,
+                        key_name,
+                        existing_action,
+                        key_name,
+                        action
+                    );
+                }
+                // Don't override explicit bindings with auto-generated equivalents
+            } else {
+                // Add the equivalent binding
+                context_bindings.insert((equiv_key, equiv_mods), action.clone());
             }
         }
     }
@@ -1817,6 +1929,164 @@ mod tests {
             resolver.resolve(&ctrl_space, KeyContext::Normal),
             Action::LspCompletion,
             "Ctrl+Space should resolve to LspCompletion"
+        );
+    }
+
+    #[test]
+    fn test_terminal_key_equivalents() {
+        // Test that terminal_key_equivalents returns correct mappings
+        let ctrl = KeyModifiers::CONTROL;
+
+        // Ctrl+/ <-> Ctrl+7
+        let slash_equivs = terminal_key_equivalents(KeyCode::Char('/'), ctrl);
+        assert_eq!(slash_equivs, vec![(KeyCode::Char('7'), ctrl)]);
+
+        let seven_equivs = terminal_key_equivalents(KeyCode::Char('7'), ctrl);
+        assert_eq!(seven_equivs, vec![(KeyCode::Char('/'), ctrl)]);
+
+        // Ctrl+Backspace <-> Ctrl+H
+        let backspace_equivs = terminal_key_equivalents(KeyCode::Backspace, ctrl);
+        assert_eq!(backspace_equivs, vec![(KeyCode::Char('h'), ctrl)]);
+
+        let h_equivs = terminal_key_equivalents(KeyCode::Char('h'), ctrl);
+        assert_eq!(h_equivs, vec![(KeyCode::Backspace, ctrl)]);
+
+        // No equivalents for regular keys
+        let a_equivs = terminal_key_equivalents(KeyCode::Char('a'), ctrl);
+        assert!(a_equivs.is_empty());
+
+        // No equivalents without Ctrl
+        let slash_no_ctrl = terminal_key_equivalents(KeyCode::Char('/'), KeyModifiers::empty());
+        assert!(slash_no_ctrl.is_empty());
+    }
+
+    #[test]
+    fn test_terminal_key_equivalents_auto_binding() {
+        let config = Config::default();
+        let resolver = KeybindingResolver::new(&config);
+
+        // Ctrl+/ should be bound to toggle_comment
+        let ctrl_slash = KeyEvent::new(KeyCode::Char('/'), KeyModifiers::CONTROL);
+        let action_slash = resolver.resolve(&ctrl_slash, KeyContext::Normal);
+        assert_eq!(
+            action_slash,
+            Action::ToggleComment,
+            "Ctrl+/ should resolve to ToggleComment"
+        );
+
+        // Ctrl+7 should also be bound to toggle_comment (auto-generated equivalent)
+        let ctrl_7 = KeyEvent::new(KeyCode::Char('7'), KeyModifiers::CONTROL);
+        let action_7 = resolver.resolve(&ctrl_7, KeyContext::Normal);
+        assert_eq!(
+            action_7,
+            Action::ToggleComment,
+            "Ctrl+7 should resolve to ToggleComment (terminal equivalent of Ctrl+/)"
+        );
+    }
+
+    #[test]
+    fn test_terminal_key_equivalents_normalization() {
+        // This test verifies that all terminal key equivalents are correctly mapped
+        // These mappings exist because terminals send different key codes for certain
+        // key combinations due to historical terminal emulation reasons.
+
+        let ctrl = KeyModifiers::CONTROL;
+
+        // === Ctrl+/ <-> Ctrl+7 ===
+        // Most terminals send Ctrl+7 (0x1F) when user presses Ctrl+/
+        let slash_equivs = terminal_key_equivalents(KeyCode::Char('/'), ctrl);
+        assert_eq!(
+            slash_equivs,
+            vec![(KeyCode::Char('7'), ctrl)],
+            "Ctrl+/ should map to Ctrl+7"
+        );
+        let seven_equivs = terminal_key_equivalents(KeyCode::Char('7'), ctrl);
+        assert_eq!(
+            seven_equivs,
+            vec![(KeyCode::Char('/'), ctrl)],
+            "Ctrl+7 should map back to Ctrl+/"
+        );
+
+        // === Ctrl+Backspace <-> Ctrl+H ===
+        // Many terminals send Ctrl+H (0x08, ASCII backspace) for Ctrl+Backspace
+        let backspace_equivs = terminal_key_equivalents(KeyCode::Backspace, ctrl);
+        assert_eq!(
+            backspace_equivs,
+            vec![(KeyCode::Char('h'), ctrl)],
+            "Ctrl+Backspace should map to Ctrl+H"
+        );
+        let h_equivs = terminal_key_equivalents(KeyCode::Char('h'), ctrl);
+        assert_eq!(
+            h_equivs,
+            vec![(KeyCode::Backspace, ctrl)],
+            "Ctrl+H should map back to Ctrl+Backspace"
+        );
+
+        // === Ctrl+Space <-> Ctrl+@ ===
+        // Ctrl+Space sends NUL (0x00), same as Ctrl+@
+        let space_equivs = terminal_key_equivalents(KeyCode::Char(' '), ctrl);
+        assert_eq!(
+            space_equivs,
+            vec![(KeyCode::Char('@'), ctrl)],
+            "Ctrl+Space should map to Ctrl+@"
+        );
+        let at_equivs = terminal_key_equivalents(KeyCode::Char('@'), ctrl);
+        assert_eq!(
+            at_equivs,
+            vec![(KeyCode::Char(' '), ctrl)],
+            "Ctrl+@ should map back to Ctrl+Space"
+        );
+
+        // === Ctrl+- <-> Ctrl+_ ===
+        // Ctrl+- and Ctrl+_ both send 0x1F in some terminals
+        let minus_equivs = terminal_key_equivalents(KeyCode::Char('-'), ctrl);
+        assert_eq!(
+            minus_equivs,
+            vec![(KeyCode::Char('_'), ctrl)],
+            "Ctrl+- should map to Ctrl+_"
+        );
+        let underscore_equivs = terminal_key_equivalents(KeyCode::Char('_'), ctrl);
+        assert_eq!(
+            underscore_equivs,
+            vec![(KeyCode::Char('-'), ctrl)],
+            "Ctrl+_ should map back to Ctrl+-"
+        );
+
+        // === No equivalents for regular keys ===
+        assert!(
+            terminal_key_equivalents(KeyCode::Char('a'), ctrl).is_empty(),
+            "Ctrl+A should have no terminal equivalents"
+        );
+        assert!(
+            terminal_key_equivalents(KeyCode::Char('z'), ctrl).is_empty(),
+            "Ctrl+Z should have no terminal equivalents"
+        );
+        assert!(
+            terminal_key_equivalents(KeyCode::Enter, ctrl).is_empty(),
+            "Ctrl+Enter should have no terminal equivalents"
+        );
+
+        // === No equivalents without Ctrl modifier ===
+        assert!(
+            terminal_key_equivalents(KeyCode::Char('/'), KeyModifiers::empty()).is_empty(),
+            "/ without Ctrl should have no equivalents"
+        );
+        assert!(
+            terminal_key_equivalents(KeyCode::Char('7'), KeyModifiers::SHIFT).is_empty(),
+            "Shift+7 should have no equivalents"
+        );
+        assert!(
+            terminal_key_equivalents(KeyCode::Char('h'), KeyModifiers::ALT).is_empty(),
+            "Alt+H should have no equivalents"
+        );
+
+        // === Ctrl+H only maps to Backspace when ONLY Ctrl is pressed ===
+        // Ctrl+Shift+H or Ctrl+Alt+H should NOT map to Backspace
+        let ctrl_shift = KeyModifiers::CONTROL | KeyModifiers::SHIFT;
+        let ctrl_shift_h_equivs = terminal_key_equivalents(KeyCode::Char('h'), ctrl_shift);
+        assert!(
+            ctrl_shift_h_equivs.is_empty(),
+            "Ctrl+Shift+H should NOT map to Ctrl+Shift+Backspace"
         );
     }
 }

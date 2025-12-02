@@ -227,6 +227,28 @@
       "when": "normal"
     },
     {
+      "comment": "Normal context - Emacs-style readline bindings",
+      "key": "e",
+      "modifiers": ["ctrl"],
+      "action": "move_line_end",
+      "args": {},
+      "when": "normal"
+    },
+    {
+      "key": "b",
+      "modifiers": ["alt"],
+      "action": "move_word_left",
+      "args": {},
+      "when": "normal"
+    },
+    {
+      "key": "f",
+      "modifiers": ["alt"],
+      "action": "move_word_right",
+      "args": {},
+      "when": "normal"
+    },
+    {
       "comment": "Normal context - Selection",
       "key": "Left",
       "modifiers": ["shift"],
@@ -750,13 +772,6 @@
       "when": "normal"
     },
     {
-      "key": "7",
-      "modifiers": ["ctrl"],
-      "action": "play_macro",
-      "args": {"char": "7"},
-      "when": "normal"
-    },
-    {
       "key": "8",
       "modifiers": ["ctrl"],
       "action": "play_macro",
@@ -1051,6 +1066,28 @@
     {
       "key": "Right",
       "modifiers": ["ctrl"],
+      "action": "prompt_move_word_right",
+      "args": {},
+      "when": "prompt"
+    },
+    {
+      "comment": "Prompt context - Emacs-style readline bindings",
+      "key": "e",
+      "modifiers": ["ctrl"],
+      "action": "prompt_move_end",
+      "args": {},
+      "when": "prompt"
+    },
+    {
+      "key": "b",
+      "modifiers": ["alt"],
+      "action": "prompt_move_word_left",
+      "args": {},
+      "when": "prompt"
+    },
+    {
+      "key": "f",
+      "modifiers": ["alt"],
       "action": "prompt_move_word_right",
       "args": {},
       "when": "prompt"
