@@ -232,6 +232,52 @@ impl Editor {
             .map(|p| p.input.clone())
             .unwrap_or_default();
 
+        // Check if user typed a directory name ending with "/"
+        // If so, navigate into that directory
+        if filter.ends_with('/') {
+            let dir_name = &filter[..filter.len() - 1];
+            if !dir_name.is_empty() {
+                // Find a matching directory entry
+                let matching_dir = self.file_open_state.as_ref().and_then(|state| {
+                    state.entries.iter().find(|e| {
+                        e.fs_entry.is_dir()
+                            && e.fs_entry.name.to_lowercase() == dir_name.to_lowercase()
+                    })
+                });
+
+                if let Some(entry) = matching_dir {
+                    let path = entry.fs_entry.path.clone();
+                    self.file_open_navigate_to(path);
+                    return;
+                }
+
+                // If no exact match, try fuzzy match - navigate to best matching directory
+                let best_match_dir = self.file_open_state.as_ref().and_then(|state| {
+                    use crate::input::fuzzy::fuzzy_match;
+                    state
+                        .entries
+                        .iter()
+                        .filter(|e| e.fs_entry.is_dir() && e.fs_entry.name != "..")
+                        .filter_map(|e| {
+                            let result = fuzzy_match(dir_name, &e.fs_entry.name);
+                            if result.matched {
+                                Some((e, result.score))
+                            } else {
+                                None
+                            }
+                        })
+                        .max_by_key(|(_, score)| *score)
+                        .map(|(e, _)| e)
+                });
+
+                if let Some(entry) = best_match_dir {
+                    let path = entry.fs_entry.path.clone();
+                    self.file_open_navigate_to(path);
+                    return;
+                }
+            }
+        }
+
         if let Some(state) = &mut self.file_open_state {
             state.apply_filter(&filter);
         }

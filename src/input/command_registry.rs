@@ -3,7 +3,8 @@
 //! This module allows plugins to register custom commands dynamically
 //! while maintaining the built-in command set.
 
-use crate::input::commands::{get_all_commands, Command, CommandSource, Suggestion};
+use crate::input::commands::{get_all_commands, Command, Suggestion};
+use crate::input::fuzzy::fuzzy_match;
 use crate::input::keybindings::Action;
 use crate::input::keybindings::KeyContext;
 use std::sync::{Arc, RwLock};
@@ -101,7 +102,8 @@ impl CommandRegistry {
     /// Filter commands by fuzzy matching query with context awareness
     ///
     /// When query is empty, commands are sorted by recency (most recently used first).
-    /// When query is not empty, commands are sorted by match quality with recency as tiebreaker.
+    /// When query is not empty, commands are sorted by match quality (fzf-style scoring)
+    /// with recency as tiebreaker for equal scores.
     /// Disabled commands always appear after enabled ones.
     pub fn filter(
         &self,
@@ -110,7 +112,6 @@ impl CommandRegistry {
         keybinding_resolver: &crate::input::keybindings::KeybindingResolver,
         selection_active: bool,
     ) -> Vec<Suggestion> {
-        let query_lower = query.to_lowercase();
         let commands = self.get_all();
 
         // Helper function to check if command is available in current context
@@ -119,34 +120,16 @@ impl CommandRegistry {
             cmd.contexts.is_empty() || cmd.contexts.contains(&current_context)
         };
 
-        // Helper function for fuzzy matching
-        let matches_query = |cmd: &Command| -> bool {
-            if query.is_empty() {
-                return true;
-            }
-
-            let name_lower = cmd.name.to_lowercase();
-            let mut query_chars = query_lower.chars();
-            let mut current_char = query_chars.next();
-
-            for name_char in name_lower.chars() {
-                if let Some(qc) = current_char {
-                    if qc == name_char {
-                        current_char = query_chars.next();
-                    }
-                } else {
-                    break;
-                }
-            }
-
-            current_char.is_none() // All query characters matched
-        };
-
-        // Filter and convert to suggestions with history position
-        let mut suggestions: Vec<(Suggestion, Option<usize>)> = commands
+        // Filter and convert to suggestions with history position and fuzzy score
+        let mut suggestions: Vec<(Suggestion, Option<usize>, i32)> = commands
             .into_iter()
-            .filter(|cmd| matches_query(cmd))
-            .map(|cmd| {
+            .filter_map(|cmd| {
+                // Use fuzzy matching
+                let fuzzy_result = fuzzy_match(query, &cmd.name);
+                if !fuzzy_result.matched {
+                    return None;
+                }
+
                 let mut available = is_available(&cmd);
                 if cmd.action == Action::FindInSelection && !selection_active {
                     available = false;
@@ -161,18 +144,28 @@ impl CommandRegistry {
                     keybinding,
                     Some(cmd.source),
                 );
-                (suggestion, history_pos)
+                Some((suggestion, history_pos, fuzzy_result.score))
             })
             .collect();
 
         // Sort by:
         // 1. Disabled status (enabled first)
-        // 2. History position (recent first, then never-used alphabetically)
-        suggestions.sort_by(|(a, a_hist), (b, b_hist)| {
+        // 2. Fuzzy match score (higher is better) - only when query is not empty
+        // 3. History position (recent first, then never-used alphabetically)
+        let has_query = !query.is_empty();
+        suggestions.sort_by(|(a, a_hist, a_score), (b, b_hist, b_score)| {
             // First sort by disabled status
             match a.disabled.cmp(&b.disabled) {
                 std::cmp::Ordering::Equal => {}
                 other => return other,
+            }
+
+            // When there's a query, sort by fuzzy score (higher is better)
+            if has_query {
+                match b_score.cmp(a_score) {
+                    std::cmp::Ordering::Equal => {}
+                    other => return other,
+                }
             }
 
             // Then sort by history position (lower = more recent = better)
@@ -185,7 +178,7 @@ impl CommandRegistry {
         });
 
         // Extract just the suggestions
-        suggestions.into_iter().map(|(s, _)| s).collect()
+        suggestions.into_iter().map(|(s, _, _)| s).collect()
     }
 
     /// Get count of registered plugin commands
@@ -225,6 +218,7 @@ impl Default for CommandRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::input::commands::CommandSource;
     use crate::input::keybindings::Action;
 
     #[test]

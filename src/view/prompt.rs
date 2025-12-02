@@ -89,8 +89,10 @@ pub struct Prompt {
     pub cursor_pos: usize,
     /// What to do when user confirms
     pub prompt_type: PromptType,
-    /// Autocomplete suggestions
+    /// Autocomplete suggestions (filtered)
     pub suggestions: Vec<Suggestion>,
+    /// Original unfiltered suggestions (for prompts that filter client-side like SwitchToTab)
+    pub original_suggestions: Option<Vec<Suggestion>>,
     /// Currently selected suggestion index
     pub selected_suggestion: Option<usize>,
     /// Selection anchor position (for Shift+Arrow selection)
@@ -107,12 +109,16 @@ impl Prompt {
             cursor_pos: 0,
             prompt_type,
             suggestions: Vec::new(),
+            original_suggestions: None,
             selected_suggestion: None,
             selection_anchor: None,
         }
     }
 
     /// Create a new prompt with suggestions
+    ///
+    /// The suggestions are stored both as the current filtered list and as the original
+    /// unfiltered list (for prompts that filter client-side like SwitchToTab).
     pub fn with_suggestions(
         message: String,
         prompt_type: PromptType,
@@ -128,6 +134,7 @@ impl Prompt {
             input: String::new(),
             cursor_pos: 0,
             prompt_type,
+            original_suggestions: Some(suggestions.clone()),
             suggestions,
             selected_suggestion,
             selection_anchor: None,
@@ -147,6 +154,7 @@ impl Prompt {
             cursor_pos,
             prompt_type,
             suggestions: Vec::new(),
+            original_suggestions: None,
             selected_suggestion: None,
             selection_anchor: None,
         }

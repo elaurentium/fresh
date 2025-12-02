@@ -3909,6 +3909,37 @@ impl Editor {
                     ts_manager.run_hook("prompt_changed", hook_args);
                 }
             }
+            PromptType::SwitchToTab | PromptType::SelectTheme | PromptType::StopLspServer => {
+                // Filter suggestions using fuzzy matching
+                use crate::input::fuzzy::fuzzy_match;
+
+                if let Some(prompt) = &mut self.prompt {
+                    if let Some(original) = &prompt.original_suggestions {
+                        // Apply fuzzy filtering with scoring
+                        let mut filtered: Vec<(crate::input::commands::Suggestion, i32)> = original
+                            .iter()
+                            .filter_map(|s| {
+                                let result = fuzzy_match(&input, &s.text);
+                                if result.matched {
+                                    Some((s.clone(), result.score))
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+
+                        // Sort by score (best matches first)
+                        filtered.sort_by(|a, b| b.1.cmp(&a.1));
+
+                        prompt.suggestions = filtered.into_iter().map(|(s, _)| s).collect();
+                        prompt.selected_suggestion = if prompt.suggestions.is_empty() {
+                            None
+                        } else {
+                            Some(0)
+                        };
+                    }
+                }
+            }
             _ => {}
         }
     }

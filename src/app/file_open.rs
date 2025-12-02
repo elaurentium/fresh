@@ -4,6 +4,7 @@
 //! It renders a structured popup above the prompt with sortable columns,
 //! navigation shortcuts, and filtering.
 
+use crate::input::fuzzy::fuzzy_match;
 use crate::services::fs::{FsEntry, FsEntryType};
 use std::cmp::Ordering;
 use std::path::PathBuf;
@@ -16,6 +17,8 @@ pub struct FileOpenEntry {
     pub fs_entry: FsEntry,
     /// Whether this entry matches the current filter
     pub matches_filter: bool,
+    /// Fuzzy match score (higher is better match, used for sorting when filter is active)
+    pub match_score: i32,
 }
 
 /// Sort mode for file list
@@ -201,6 +204,7 @@ impl FileOpenState {
             result.push(FileOpenEntry {
                 fs_entry: parent_entry,
                 matches_filter: true,
+                match_score: 0,
             });
         }
 
@@ -212,6 +216,7 @@ impl FileOpenState {
                 .map(|fs_entry| FileOpenEntry {
                     fs_entry,
                     matches_filter: true,
+                    match_score: 0,
                 }),
         );
 
@@ -238,15 +243,42 @@ impl FileOpenState {
     }
 
     /// Apply filter text to entries
-    /// Note: Does not re-sort entries - just marks which ones match the filter.
-    /// Non-matching entries are de-emphasized visually but stay in place.
+    /// When filter is active, entries are sorted by fuzzy match score (best matches first).
+    /// Non-matching entries are de-emphasized visually but stay at the bottom.
     pub fn apply_filter(&mut self, filter: &str) {
         self.filter = filter.to_string();
         self.apply_filter_internal();
-        // Don't re-sort - entries stay in their original sorted position
 
-        // When filter is non-empty, select first matching entry (skip "..")
+        // When filter is non-empty, sort by match score (best matches first)
         if !filter.is_empty() {
+            self.entries.sort_by(|a, b| {
+                // ".." always stays at top
+                let a_is_parent = a.fs_entry.name == "..";
+                let b_is_parent = b.fs_entry.name == "..";
+
+                if a_is_parent && !b_is_parent {
+                    return Ordering::Less;
+                }
+                if !a_is_parent && b_is_parent {
+                    return Ordering::Greater;
+                }
+
+                // Matching entries before non-matching
+                match (a.matches_filter, b.matches_filter) {
+                    (true, false) => Ordering::Less,
+                    (false, true) => Ordering::Greater,
+                    (true, true) => {
+                        // Both match: sort by score descending (higher score = better match)
+                        b.match_score.cmp(&a.match_score)
+                    }
+                    (false, false) => {
+                        // Neither match: keep alphabetical order
+                        a.fs_entry.name.to_lowercase().cmp(&b.fs_entry.name.to_lowercase())
+                    }
+                }
+            });
+
+            // Select first matching entry (skip "..")
             let first_match = self
                 .entries
                 .iter()
@@ -258,16 +290,22 @@ impl FileOpenState {
                 self.selected_index = None;
             }
         } else {
-            // No filter = no selection
+            // No filter: restore normal sort order and clear selection
+            self.sort_entries();
             self.selected_index = None;
         }
     }
 
     fn apply_filter_internal(&mut self) {
-        let filter_lower = self.filter.to_lowercase();
         for entry in &mut self.entries {
-            entry.matches_filter = self.filter.is_empty()
-                || entry.fs_entry.name.to_lowercase().contains(&filter_lower);
+            if self.filter.is_empty() {
+                entry.matches_filter = true;
+                entry.match_score = 0;
+            } else {
+                let result = fuzzy_match(&self.filter, &entry.fs_entry.name);
+                entry.matches_filter = result.matched;
+                entry.match_score = result.score;
+            }
         }
     }
 
@@ -676,16 +714,17 @@ mod tests {
 
         state.apply_filter("foo");
 
-        // Entries stay in sorted order (alphabetical), filter just marks matches
-        // bar.txt, foo.txt, foobar.txt
-        assert_eq!(state.entries[0].fs_entry.name, "bar.txt");
-        assert!(!state.entries[0].matches_filter); // bar doesn't match "foo"
+        // With fuzzy matching, matching entries are sorted by score and appear first
+        // foo.txt has a better score (starts with "foo") than foobar.txt
+        // Non-matching bar.txt appears last
+        assert_eq!(state.entries[0].fs_entry.name, "foo.txt");
+        assert!(state.entries[0].matches_filter);
 
-        assert_eq!(state.entries[1].fs_entry.name, "foo.txt");
-        assert!(state.entries[1].matches_filter); // foo matches
+        assert_eq!(state.entries[1].fs_entry.name, "foobar.txt");
+        assert!(state.entries[1].matches_filter);
 
-        assert_eq!(state.entries[2].fs_entry.name, "foobar.txt");
-        assert!(state.entries[2].matches_filter); // foobar matches
+        assert_eq!(state.entries[2].fs_entry.name, "bar.txt");
+        assert!(!state.entries[2].matches_filter);
 
         assert_eq!(state.matching_count(), 2);
     }
@@ -702,16 +741,13 @@ mod tests {
 
         state.apply_filter("readme");
 
-        // Entries stay in sorted order, filter just marks matches
-        // other.txt, README.md, readme.txt (case-insensitive alphabetical)
-        assert_eq!(state.entries[0].fs_entry.name, "other.txt");
-        assert!(!state.entries[0].matches_filter);
-
-        assert_eq!(state.entries[1].fs_entry.name, "README.md");
+        // Matching entries first (sorted by score), non-matching last
+        // Both README.md and readme.txt match with similar scores
+        assert!(state.entries[0].matches_filter);
         assert!(state.entries[1].matches_filter);
 
-        assert_eq!(state.entries[2].fs_entry.name, "readme.txt");
-        assert!(state.entries[2].matches_filter);
+        assert_eq!(state.entries[2].fs_entry.name, "other.txt");
+        assert!(!state.entries[2].matches_filter);
     }
 
     #[test]
@@ -772,5 +808,46 @@ mod tests {
 
         state.select_last();
         assert_eq!(state.selected_index, Some(2));
+    }
+
+    #[test]
+    fn test_fuzzy_filter() {
+        // Use root path so no ".." entry is added
+        let mut state = FileOpenState::new(PathBuf::from("/"));
+        state.set_entries(vec![
+            make_entry("command_registry.rs", false),
+            make_entry("commands.rs", false),
+            make_entry("keybindings.rs", false),
+            make_entry("mod.rs", false),
+        ]);
+
+        // Fuzzy match "cmdreg" should match "command_registry.rs"
+        state.apply_filter("cmdreg");
+
+        // command_registry.rs should match and be first
+        assert!(state.entries[0].matches_filter);
+        assert_eq!(state.entries[0].fs_entry.name, "command_registry.rs");
+
+        // commands.rs might also match "cmd" part
+        // Other files shouldn't match
+        assert_eq!(state.matching_count(), 1);
+    }
+
+    #[test]
+    fn test_fuzzy_filter_sparse_match() {
+        // Use root path so no ".." entry is added
+        let mut state = FileOpenState::new(PathBuf::from("/"));
+        state.set_entries(vec![
+            make_entry("Save File", false),
+            make_entry("Select All", false),
+            make_entry("something_else.txt", false),
+        ]);
+
+        // "sf" should match "Save File" (S and F)
+        state.apply_filter("sf");
+
+        assert_eq!(state.matching_count(), 1);
+        assert!(state.entries[0].matches_filter);
+        assert_eq!(state.entries[0].fs_entry.name, "Save File");
     }
 }
