@@ -146,7 +146,6 @@ fn test_open_file_workflow() {
 /// Test opening a non-existent file creates an unsaved buffer
 #[test]
 fn test_open_nonexistent_file() {
-
     // Use harness with temp project so file paths are relative
     let mut harness = EditorTestHarness::with_temp_project(80, 24).unwrap();
     let project_dir = harness.project_dir().unwrap();
