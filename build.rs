@@ -3,7 +3,7 @@
 //! Generates TypeScript type definitions from Rust op definitions
 //! and JSON Schema for configuration.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::Path;
 
@@ -1532,7 +1532,7 @@ fn apply_rename_style(name: &str, style: &str) -> String {
 /// Convert Rust type to JSON Schema type
 fn rust_type_to_json_schema(
     rust_type: &str,
-    definitions: &HashMap<String, serde_json::Value>,
+    definitions: &BTreeMap<String, serde_json::Value>,
 ) -> serde_json::Value {
     let rust_type = rust_type.trim();
 
@@ -1618,7 +1618,7 @@ fn rust_type_to_json_schema(
 
 /// Generate full JSON Schema from extracted structs
 fn generate_json_schema(structs: &[ConfigStructInfo]) -> serde_json::Value {
-    let mut definitions: HashMap<String, serde_json::Value> = HashMap::new();
+    let mut definitions: BTreeMap<String, serde_json::Value> = BTreeMap::new();
 
     // First pass: collect all definition names
     let def_names: std::collections::HashSet<String> =
@@ -1648,12 +1648,12 @@ fn generate_struct_schema(
     struct_info: &ConfigStructInfo,
     def_names: &std::collections::HashSet<String>,
 ) -> serde_json::Value {
-    let definitions: HashMap<String, serde_json::Value> = def_names
+    let definitions: BTreeMap<String, serde_json::Value> = def_names
         .iter()
         .map(|name| (name.clone(), serde_json::json!({})))
         .collect();
 
-    let mut properties: HashMap<String, serde_json::Value> = HashMap::new();
+    let mut properties: BTreeMap<String, serde_json::Value> = BTreeMap::new();
     let mut required: Vec<String> = Vec::new();
 
     for field in &struct_info.fields {
@@ -1687,6 +1687,7 @@ fn generate_struct_schema(
     });
 
     if !required.is_empty() {
+        required.sort();
         schema["required"] = serde_json::json!(required);
     }
 
