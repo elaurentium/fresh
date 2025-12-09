@@ -2338,6 +2338,12 @@ impl Editor {
         // Track the previous buffer for "Switch to Previous Tab" command
         let previous = self.active_buffer();
 
+        // If leaving a terminal buffer while in terminal mode, exit terminal mode
+        if self.terminal_mode && self.is_terminal_buffer(previous) {
+            self.terminal_mode = false;
+            self.key_context = crate::input::keybindings::KeyContext::Normal;
+        }
+
         // Update split manager (single source of truth)
         self.split_manager.set_active_buffer_id(buffer_id);
 
@@ -2361,6 +2367,41 @@ impl Editor {
             let hook_args =
                 crate::services::plugins::hooks::HookArgs::BufferActivated { buffer_id };
             ts_manager.run_hook("buffer_activated", hook_args);
+        }
+    }
+
+    /// Focus a split and its buffer, handling all side effects including terminal mode.
+    ///
+    /// This is the primary method for switching focus between splits via mouse clicks.
+    /// It handles:
+    /// - Exiting terminal mode when leaving a terminal buffer
+    /// - Updating split manager state
+    /// - Managing tab state and previous buffer tracking
+    /// - Syncing file explorer
+    ///
+    /// Use this instead of calling set_active_split directly when switching focus.
+    pub(super) fn focus_split(&mut self, split_id: crate::model::event::SplitId, buffer_id: BufferId) {
+        let previous_buffer = self.active_buffer();
+        let buffer_changed = previous_buffer != buffer_id;
+
+        // Exit terminal mode if leaving a terminal buffer
+        if buffer_changed && self.terminal_mode && self.is_terminal_buffer(previous_buffer) {
+            self.terminal_mode = false;
+            self.key_context = crate::input::keybindings::KeyContext::Normal;
+        }
+
+        // Update split manager
+        self.split_manager.set_active_split(split_id);
+
+        // Handle buffer change side effects
+        if buffer_changed {
+            self.position_history.commit_pending_movement();
+            let active_split = self.split_manager.active_split();
+            if let Some(view_state) = self.split_view_states.get_mut(&active_split) {
+                view_state.add_buffer(buffer_id);
+                view_state.previous_buffer = Some(previous_buffer);
+            }
+            self.sync_file_explorer_to_active_file();
         }
     }
 

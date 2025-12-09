@@ -401,8 +401,9 @@ impl Editor {
 
     /// Handle FocusSplit command
     pub(super) fn handle_focus_split(&mut self, split_id: SplitId) {
-        if self.split_manager.set_active_split(split_id) {
-            // NOTE: active_buffer is derived from split_manager, no sync needed
+        // Get the buffer for this split
+        if let Some(buffer_id) = self.split_manager.buffer_for_split(split_id) {
+            self.focus_split(split_id, buffer_id);
             tracing::info!("Focused split {:?}", split_id);
         } else {
             tracing::warn!("Split {:?} not found", split_id);

@@ -2871,12 +2871,7 @@ impl Editor {
         );
 
         if let Some((split_id, buffer_id, scrollbar_rect, is_on_thumb)) = scrollbar_hit {
-            // Focus this split
-            self.split_manager.set_active_split(split_id);
-            if buffer_id != self.active_buffer() {
-                self.position_history.commit_pending_movement();
-                self.set_active_buffer(buffer_id);
-            }
+            self.focus_split(split_id, buffer_id);
 
             if is_on_thumb {
                 // Click on thumb - start drag from current position (don't jump)
@@ -2971,8 +2966,7 @@ impl Editor {
         );
 
         if let Some((split_id, clicked_buffer, clicked_close)) = tab_click {
-            // Focus this split when clicking on its tab bar
-            self.split_manager.set_active_split(split_id);
+            self.focus_split(split_id, clicked_buffer);
 
             // Handle close button click
             if clicked_close {
@@ -2993,12 +2987,6 @@ impl Editor {
                     }
                 }
                 return Ok(());
-            }
-
-            // Switch to the clicked buffer
-            if clicked_buffer != self.active_buffer() {
-                self.position_history.commit_pending_movement();
-                self.set_active_buffer(clicked_buffer);
             }
             return Ok(());
         }
@@ -3746,12 +3734,8 @@ impl Editor {
             }
         }
 
-        // Focus this split
-        self.split_manager.set_active_split(split_id);
-        if buffer_id != self.active_buffer() {
-            self.position_history.commit_pending_movement();
-            self.set_active_buffer(buffer_id);
-        }
+        // Focus this split (handles terminal mode exit, tab state, etc.)
+        self.focus_split(split_id, buffer_id);
 
         // Get cached view line mappings for this split (before mutable borrow of buffers)
         let cached_mappings = self
