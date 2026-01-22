@@ -2197,6 +2197,12 @@ impl Editor {
 
 #[cfg(test)]
 mod tests {
+    use crate::model::filesystem::StdFileSystem;
+    use std::sync::Arc;
+
+    fn test_fs() -> Arc<dyn crate::model::filesystem::FileSystem + Send + Sync> {
+        Arc::new(StdFileSystem)
+    }
     use super::Editor;
     use crate::model::buffer::Buffer;
     use crate::state::EditorState;
@@ -2218,8 +2224,12 @@ mod tests {
 
     #[test]
     fn test_inlay_hint_inserts_before_character() {
-        let mut state =
-            EditorState::new(80, 24, crate::config::LARGE_FILE_THRESHOLD_BYTES as usize);
+        let mut state = EditorState::new(
+            80,
+            24,
+            crate::config::LARGE_FILE_THRESHOLD_BYTES as usize,
+            test_fs(),
+        );
         state.buffer = Buffer::from_str_test("ab");
 
         if !state.buffer.is_empty() {
@@ -2240,8 +2250,12 @@ mod tests {
 
     #[test]
     fn test_inlay_hint_at_eof_renders_after_last_char() {
-        let mut state =
-            EditorState::new(80, 24, crate::config::LARGE_FILE_THRESHOLD_BYTES as usize);
+        let mut state = EditorState::new(
+            80,
+            24,
+            crate::config::LARGE_FILE_THRESHOLD_BYTES as usize,
+            test_fs(),
+        );
         state.buffer = Buffer::from_str_test("ab");
 
         if !state.buffer.is_empty() {
@@ -2262,8 +2276,12 @@ mod tests {
 
     #[test]
     fn test_inlay_hint_empty_buffer_is_ignored() {
-        let mut state =
-            EditorState::new(80, 24, crate::config::LARGE_FILE_THRESHOLD_BYTES as usize);
+        let mut state = EditorState::new(
+            80,
+            24,
+            crate::config::LARGE_FILE_THRESHOLD_BYTES as usize,
+            test_fs(),
+        );
         state.buffer = Buffer::from_str_test("");
 
         let hints = vec![make_hint(0, 0, ": i32", Some(InlayHintKind::TYPE))];
