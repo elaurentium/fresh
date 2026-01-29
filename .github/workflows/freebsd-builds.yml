@@ -20,7 +20,7 @@ jobs:
           # rsync is the default, ensuring target/ and archives come back to the host
           sync: rsync
           prepare: |
-            pkg install -y rust pkgconf
+            pkg install -y rust pkgconf llvm
           run: |
             set -e  # Exit immediately on any error
 
