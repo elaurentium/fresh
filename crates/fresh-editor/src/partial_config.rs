@@ -171,6 +171,7 @@ pub struct PartialEditorConfig {
     pub show_menu_bar: Option<bool>,
     pub show_tab_bar: Option<bool>,
     pub use_terminal_bg: Option<bool>,
+    pub auto_save_enabled: Option<bool>,
 }
 
 impl Merge for PartialEditorConfig {
@@ -238,6 +239,7 @@ impl Merge for PartialEditorConfig {
         self.show_menu_bar.merge_from(&other.show_menu_bar);
         self.show_tab_bar.merge_from(&other.show_tab_bar);
         self.use_terminal_bg.merge_from(&other.use_terminal_bg);
+        self.auto_save_enabled.merge_from(&other.auto_save_enabled);
     }
 }
 
@@ -436,6 +438,7 @@ impl From<&crate::config::EditorConfig> for PartialEditorConfig {
             show_menu_bar: Some(cfg.show_menu_bar),
             show_tab_bar: Some(cfg.show_tab_bar),
             use_terminal_bg: Some(cfg.use_terminal_bg),
+            auto_save_enabled: Some(cfg.auto_save_enabled),
         }
     }
 }
@@ -532,6 +535,7 @@ impl PartialEditorConfig {
             show_menu_bar: self.show_menu_bar.unwrap_or(defaults.show_menu_bar),
             show_tab_bar: self.show_tab_bar.unwrap_or(defaults.show_tab_bar),
             use_terminal_bg: self.use_terminal_bg.unwrap_or(defaults.use_terminal_bg),
+            auto_save_enabled: self.auto_save_enabled.unwrap_or(defaults.auto_save_enabled),
         }
     }
 }

@@ -4,6 +4,7 @@
   "editor": {
     "tab_size": 4,
     "auto_indent": true,
+    "auto_save_enabled": true,
     "line_numbers": true,
     "relative_line_numbers": false,
     "scroll_offset": 3,

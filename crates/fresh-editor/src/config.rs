@@ -596,7 +596,14 @@ pub struct EditorConfig {
     #[schemars(extend("x-section" = "Mouse"))]
     pub double_click_time_ms: u64,
 
-    // ===== Recovery =====
+    /// Whether to enable persistent auto-save (save to original file on disk).
+    /// When enabled, modified buffers are saved to their original file path
+    /// based on the auto_save_interval_secs interval.
+    /// Default: false
+    #[serde(default = "default_false")]
+    #[schemars(extend("x-section" = "Recovery"))]
+    pub auto_save_enabled: bool,
+
     /// Whether to enable file recovery (Emacs-style auto-save)
     /// When enabled, buffers are periodically saved to recovery files
     /// so they can be recovered if the editor crashes.
@@ -604,10 +611,11 @@ pub struct EditorConfig {
     #[schemars(extend("x-section" = "Recovery"))]
     pub recovery_enabled: bool,
 
-    /// Auto-save interval in seconds for file recovery
-    /// Modified buffers are saved to recovery files at this interval.
+    /// Auto-save interval in seconds for file recovery and persistent auto-save.
+    /// Modified buffers are saved to recovery files (if enabled) or their
+    /// original file path (if auto_save_enabled is true) at this interval.
     /// Default: 2 seconds for fast recovery with minimal data loss.
-    /// Set to 0 to disable periodic auto-save (manual recovery only).
+    /// Set to 0 to disable periodic auto-save.
     #[serde(default = "default_auto_save_interval")]
     #[schemars(extend("x-section" = "Recovery"))]
     pub auto_save_interval_secs: u32,
@@ -785,6 +793,7 @@ impl Default for EditorConfig {
             enable_inlay_hints: true,
             enable_semantic_tokens_full: false,
             recovery_enabled: true,
+            auto_save_enabled: false,
             auto_save_interval_secs: default_auto_save_interval(),
             highlight_context_bytes: default_highlight_context_bytes(),
             mouse_hover_enabled: true,

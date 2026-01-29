@@ -594,8 +594,11 @@ pub struct Editor {
     /// Time source for testable time operations
     time_source: SharedTimeSource,
 
-    /// Last auto-save time for rate limiting
+    /// Last auto-save time for rate limiting (recovery)
     last_auto_save: std::time::Instant,
+
+    /// Last persistent auto-save time for rate limiting (disk)
+    last_persistent_auto_save: std::time::Instant,
 
     /// Active custom contexts for command visibility
     /// Plugin-defined contexts like "config-editor" that control command availability
@@ -794,6 +797,7 @@ impl Editor {
     ) -> AnyhowResult<Self> {
         // Use provided time_source or default to RealTimeSource
         let time_source = time_source.unwrap_or_else(RealTimeSource::shared);
+        let now = time_source.now();
         tracing::info!("Editor::new called with width={}, height={}", width, height);
 
         // Use provided working_dir or capture from environment
@@ -1203,7 +1207,8 @@ impl Editor {
             },
             full_redraw_requested: false,
             time_source: time_source.clone(),
-            last_auto_save: time_source.now(),
+            last_auto_save: now,
+            last_persistent_auto_save: now,
             active_custom_contexts: HashSet::new(),
             editor_mode: None,
             warning_log: None,
