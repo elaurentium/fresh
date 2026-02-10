@@ -1157,6 +1157,33 @@
                 <a href="public/assets/fresh-i18nlight.png" target="_blank"><img src="public/assets/fresh-i18nlight.png" alt="Fresh with Japanese interface and light theme"></a>
             </div>
         </div>
+
+        <div class="feature-section">
+            <div class="feature-content">
+                <h2>Session Persistence</h2>
+                <p>Detach and reattach to sessions that survive terminal disconnections and restarts. Open files in a running session from other apps like file managers or scripts.</p>
+                <ul class="feature-list">
+                    <li>Detach and reattach with <code style="color: var(--accent-green);">fresh -a</code></li>
+                    <li>Manage sessions from the CLI</li>
+                    <li>Open files in a running session from other apps</li>
+                </ul>
+            </div>
+            <div class="feature-visual">
+                <div class="feature-visual-dots">
+                    <span></span><span></span><span></span>
+                </div>
+                <div class="feature-code">
+                    <span class="code-line"><span class="code-comment"># Start a named session</span></span>
+                    <span class="code-line"><span class="code-function">fresh</span> <span class="code-string">-a myproject</span></span>
+                    <span class="code-line"></span>
+                    <span class="code-line"><span class="code-comment"># List active sessions</span></span>
+                    <span class="code-line"><span class="code-function">fresh</span> <span class="code-string">--cmd session list</span></span>
+                    <span class="code-line"></span>
+                    <span class="code-line"><span class="code-comment"># Open a file in a running session</span></span>
+                    <span class="code-line"><span class="code-function">fresh</span> <span class="code-string">--cmd session open-file myproject src/main.rs</span></span>
+                </div>
+            </div>
+        </div>
     </section>
 
     <!-- Installation Section -->
@@ -1250,7 +1277,7 @@
         <div class="features-grid">
             <div class="feature-card">
                 <h3>File Management</h3>
-                <p>Open, save, new, close files. Built-in file explorer with git status indicators, tabs, auto-revert, and fuzzy file finder.</p>
+                <p>Open, save, new, close files. Built-in file explorer with git status indicators, tabs, auto-revert, fuzzy file finder, and text encoding support (UTF-16, Latin-1, and more).</p>
             </div>
             <div class="feature-card">
                 <h3>Editing</h3>
@@ -1290,7 +1317,15 @@
             </div>
             <div class="feature-card">
                 <h3>Settings UI</h3>
-                <p>Graphical settings editor with search, keyboard navigation, and mouse support. No config file editing required.</p>
+                <p>Graphical settings editor and keybinding editor with search, conflict detection, and mouse support. No config file editing required.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Package Manager</h3>
+                <p>Browse, install, and uninstall plugins, themes, and language packs from the official registry. Scaffold new packages with --init.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Remote Editing</h3>
+                <p>Edit files on remote machines via SSH. Supports password/key auth, sudo save, and file explorer integration.</p>
             </div>
             <div class="feature-card">
                 <h3>Productivity</h3>
