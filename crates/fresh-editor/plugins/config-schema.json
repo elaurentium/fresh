@@ -57,7 +57,6 @@
         "double_click_time_ms": 500,
         "auto_save_enabled": false,
         "recovery_enabled": true,
-        "auto_save_interval_secs": 2,
         "auto_revert_poll_interval_ms": 2000,
         "keyboard_disambiguate_escape_codes": true,
         "keyboard_report_event_types": false,
@@ -355,7 +354,7 @@
           "default": 500
         },
         "auto_save_enabled": {
-          "description": "Whether to enable persistent auto-save (save to original file on disk).\nWhen enabled, modified buffers are saved to their original file path\nbased on the auto_save_interval_secs interval.\nDefault: false",
+          "description": "Whether to enable persistent auto-save (save to original file on disk).\nWhen enabled, modified buffers are saved to their original file path\nat a fixed 2-second interval.\nDefault: false",
           "type": "boolean",
           "x-section": "Recovery",
           "default": false
@@ -365,14 +364,6 @@
           "type": "boolean",
           "x-section": "Recovery",
           "default": true
-        },
-        "auto_save_interval_secs": {
-          "description": "Auto-save interval in seconds for file recovery and persistent auto-save.\nModified buffers are saved to recovery files (if enabled) or their\noriginal file path (if auto_save_enabled is true) at this interval.\nDefault: 2 seconds for fast recovery with minimal data loss.\nSet to 0 to disable periodic auto-save.",
-          "type": "integer",
-          "format": "uint32",
-          "minimum": 0,
-          "x-section": "Recovery",
-          "default": 2
         },
         "auto_revert_poll_interval_ms": {
           "description": "Poll interval in milliseconds for auto-reverting open buffers.\nWhen auto-revert is enabled, file modification times are checked at this interval.\nLower values detect external changes faster but use more CPU.\nDefault: 2000ms (2 seconds)",

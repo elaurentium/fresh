@@ -152,16 +152,6 @@ impl Editor {
             return Ok(0);
         }
 
-        let interval =
-            std::time::Duration::from_secs(self.config.editor.auto_save_interval_secs as u64);
-        if self
-            .time_source
-            .elapsed_since(self.last_persistent_auto_save)
-            < interval
-        {
-            return Ok(0);
-        }
-
         self.last_persistent_auto_save = self.time_source.now();
 
         // Collect info for modified buffers that have a file path

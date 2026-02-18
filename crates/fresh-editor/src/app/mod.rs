@@ -1029,7 +1029,6 @@ impl Editor {
         // Extract config values before moving config into the struct
         let file_explorer_width = config.file_explorer.width;
         let recovery_enabled = config.editor.recovery_enabled;
-        let auto_save_interval_secs = config.editor.auto_save_interval_secs;
         let check_for_updates = config.check_for_updates;
         let show_menu_bar = config.editor.show_menu_bar;
         let show_tab_bar = config.editor.show_tab_bar;
@@ -1200,7 +1199,6 @@ impl Editor {
             recovery_service: {
                 let recovery_config = RecoveryConfig {
                     enabled: recovery_enabled,
-                    auto_save_interval_secs,
                     ..RecoveryConfig::default()
                 };
                 RecoveryService::with_config_and_dir(recovery_config, dir_context.recovery_dir())

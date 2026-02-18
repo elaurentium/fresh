@@ -10,7 +10,6 @@ fn test_persistent_auto_save() -> anyhow::Result<()> {
     // 1. Setup harness with auto-save enabled
     let mut config = Config::default();
     config.editor.auto_save_enabled = true;
-    config.editor.auto_save_interval_secs = 1; // 1 second for test
 
     let mut harness = EditorTestHarness::with_temp_project_and_config(80, 24, config)?;
     let temp_dir = harness.project_dir().unwrap();
@@ -27,7 +26,7 @@ fn test_persistent_auto_save() -> anyhow::Result<()> {
     assert!(harness.editor().active_state().buffer.is_modified());
 
     // 4. Advance time
-    harness.advance_time(Duration::from_millis(1100));
+    harness.advance_time(Duration::from_millis(2100)); // Fixed 2s interval
 
     // 5. Trigger auto-save (simulating main loop)
     let saved_count = harness.editor_mut().auto_save_persistent_buffers()?;

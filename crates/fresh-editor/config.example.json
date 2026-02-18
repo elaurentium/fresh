@@ -17,7 +17,6 @@
     "enable_inlay_hints": true,
     "enable_semantic_tokens_full": false,
     "recovery_enabled": true,
-    "auto_save_interval_secs": 2,
     "highlight_context_bytes": 10000,
     "mouse_hover_enabled": true,
     "mouse_hover_delay_ms": 500,
@@ -533,7 +532,9 @@
     },
     "markdown": {
       "command": "marksman",
-      "args": ["server"],
+      "args": [
+        "server"
+      ],
       "enabled": true,
       "auto_start": false,
       "process_limits": {
@@ -545,7 +546,9 @@
     },
     "templ": {
       "command": "templ",
-      "args": ["lsp"],
+      "args": [
+        "lsp"
+      ],
       "enabled": true,
       "auto_start": false,
       "process_limits": {
